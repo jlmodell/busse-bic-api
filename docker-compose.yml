@@ -1,0 +1,13 @@
+version: '3'
+
+services:
+  api:
+    container_name: "bic_api"
+    build: .
+    ports:
+      - "3637:3637"
+    volumes:
+      - /mnt/busse3/fs1:/mnt/busse3/fs1
+    env_file:
+      - .env
+    restart: always
