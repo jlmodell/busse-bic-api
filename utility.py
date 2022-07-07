@@ -19,8 +19,6 @@ assert (
     ENCRYPTION_PASSWORD is not None
 ), "ENCRYPTION_PASSWORD environment variable not set"
 
-print(SCHEDULE_DB, SCHEDULE_XLS, SCHEDULE_TABLE, ENCRYPTION_PASSWORD)
-
 
 def convert_float_to_int(nbr: str) -> int:
     try:
@@ -120,9 +118,9 @@ def update(df_xls: pd.DataFrame):
         print(e)
 
 
-def drop(table="Released Schedule"):
-    with sqlite3.connect("schedule.db") as conn:
-        conn.execute(f"DROP TABLE IF EXISTS '{table}'")
+# def drop(table="Released Schedule"):
+#     with sqlite3.connect("schedule.db") as conn:
+#         conn.execute(f"DROP TABLE IF EXISTS '{table}'")
 
 
 def get(limit: int = 1000):
@@ -146,7 +144,3 @@ def get(limit: int = 1000):
         print(e)
 
     return df
-
-
-if __name__ == "__main__":
-    print(os.getcwd())

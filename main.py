@@ -27,7 +27,7 @@ async def refresher():
     except Exception as e:
         return JSONResponse(
             status_code=500,
-            content={"error": str(e)},
+            content={"error": str(e), "function": "unencrypt_excel"},
         )
 
     try:
@@ -35,7 +35,7 @@ async def refresher():
     except Exception as e:
         return JSONResponse(
             status_code=500,
-            content={"error": str(e)},
+            content={"error": str(e), "function": "update"},
         )
 
     return JSONResponse(content={"status": "success"})
