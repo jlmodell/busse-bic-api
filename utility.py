@@ -1,3 +1,4 @@
+import time
 import msoffcrypto, sqlite3, os
 import pandas as pd
 import io
@@ -104,13 +105,6 @@ def update(df_xls: pd.DataFrame):
                 con=conn,
             )
 
-    except sqlite3.Error as e:
-        print(e)
-    finally:
-        conn.close()
-
-    try:
-        with sqlite3.connect(db) as conn:
             df_concat = pd.concat([df, df_xls], ignore_index=True)
             df_concat.drop_duplicates(subset=["lot"], inplace=True)
 
@@ -120,10 +114,13 @@ def update(df_xls: pd.DataFrame):
             df_concat.qty = df_concat.qty.apply(lambda x: convert_float_to_int(x))
 
             df_concat.to_sql(table, con=conn, if_exists="replace", index=False)
+
     except sqlite3.Error as e:
         print(e)
     finally:
         conn.close()
+
+    return
 
 
 def drop(table="Released Schedule"):
