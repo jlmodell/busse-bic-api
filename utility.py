@@ -134,11 +134,9 @@ def get(limit: int = 1000):
 
     try:
         with sqlite3.connect(db) as conn:
-            sql_query = (
-                f"SELECT * FROM '{table}' ORDER BY run_date_time DESC LIMIT {limit}"
-            )
+            sql_query = f"SELECT * FROM '{table}' INNER JOIN 'parts' ON item=part ORDER BY run_date_time DESC LIMIT {limit}"
             if limit == -1:
-                sql_query = f"SELECT * FROM '{table}' ORDER BY run_date_time DESC"
+                sql_query = f"SELECT * FROM '{table}' INNER JOIN 'parts' ON item=part ORDER BY run_date_time DESC"
 
             df = pd.read_sql(
                 sql_query,
@@ -149,4 +147,33 @@ def get(limit: int = 1000):
     finally:
         conn.close()
 
-    return df
+    return df[["item", "lot", "run_date_time", "qty", "description"]]
+
+
+# def update_parts_table():
+#     MONGODB_URI = os.environ.get("MONGODB_URI", None)
+#     assert MONGODB_URI is not None, "MONGODB_URI environment variable not set"
+
+#     from pymongo import MongoClient
+
+#     client = MongoClient(MONGODB_URI)
+#     db = client.get_database("busserebatetraces")
+#     collection = db.get_collection("sched_data")
+
+#     docs = list(collection.find({}, {"_id": 0, "part": 1, "description": 1}))
+
+#     df = pd.DataFrame(docs)
+
+#     try:
+#         with sqlite3.connect(SCHEDULE_DB) as conn:
+#             df.to_sql("parts", con=conn, if_exists="replace", index=False)
+#     except sqlite3.Error as e:
+#         print(e)
+#     finally:
+#         conn.close()
+
+#     return
+
+
+if __name__ == "__main__":
+    print("utility.py")
