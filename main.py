@@ -1,9 +1,12 @@
+from datetime import datetime
+import os
 from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
 from utility import unencrypt_excel, update, get
-import pandas as pd
+from apscheduler.schedulers.asyncio import AsyncIOScheduler
+from apscheduler.schedulers.background import BackgroundScheduler
 
 app = FastAPI()
 app.add_middleware(
@@ -13,6 +16,33 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+
+
+async def update_lots() -> None:
+    df = unencrypt_excel()
+    update(df)
+
+    now = datetime.now()
+
+    with open(os.path.join(os.getcwd(), "logs", "updates.log"), "a") as f:
+        f.write("Updated lots at {:%Y-%m-%d %H:%M:%S}\n".format(now))
+
+    print("Updated lots at {:%Y-%m-%d %H:%M:%S}\n".format(now))
+
+    return
+
+
+@app.on_event("startup")
+async def hooks():
+    await update_lots()
+
+    scheduler = AsyncIOScheduler()
+    scheduler.add_job(
+        func=update_lots,
+        trigger="interval",
+        seconds=60 * 60,
+    )
+    scheduler.start()
 
 
 @app.get("/")

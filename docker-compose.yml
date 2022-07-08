@@ -8,6 +8,7 @@ services:
       - "3637:3637"
     volumes:
       - /mnt/busse3/fs1:/mnt/busse3/fs1
+      - ./logs:/logs
     env_file:
       - .env
     restart: always
