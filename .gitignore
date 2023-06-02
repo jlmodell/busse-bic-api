@@ -3,3 +3,5 @@ Lib
 Scripts
 /**/*.cfg
 __pycache__
+venv
+config.yaml

@@ -1,6 +1,10 @@
-import time
+# from functools import lru_cache
 import msoffcrypto, sqlite3, os
+from datetime import datetime
+
 import pandas as pd
+import numpy as np
+from db import contracts, costs  # , sched_data
 import io
 from dotenv import load_dotenv
 
@@ -20,6 +24,8 @@ assert (
     ENCRYPTION_PASSWORD is not None
 ), "ENCRYPTION_PASSWORD environment variable not set"
 
+workcenters = {}
+
 
 def convert_float_to_int(nbr: str) -> int:
     try:
@@ -27,6 +33,127 @@ def convert_float_to_int(nbr: str) -> int:
     except ValueError:
         nbr = nbr.replace(",", "").split(".")[0]
         return int(nbr)
+
+
+def calculate_gross_profit(price: float, cost: float) -> float:
+    try:
+        return price - cost
+    except TypeError:
+        print(price, cost)
+        return 0
+
+
+def calculate_gross_margin(price: float, cost: float) -> float:
+    try:
+        return ((price - cost) / price) * 100
+    except TypeError:
+        print(price, cost)
+        return 0
+    except ZeroDivisionError:
+        print(cost)
+        return 0
+
+
+def calculate_order_value(qty: float, price: float) -> float:
+    try:
+        return qty * price
+    except TypeError:
+        print(qty, price)
+        return 0
+
+
+def calculate_order_cost(qty: float, cost: float) -> float:
+    try:
+        return qty * cost
+    except TypeError:
+        print(qty, cost)
+        return 0
+
+
+def calculate_order_profit(value: float, cost: float) -> float:
+    try:
+        return value - cost
+    except TypeError:
+        print(value, cost)
+        return 0
+
+
+# def calculate_average_price(item: str, price: float) -> float:
+#     if price <= 0 or np.isnan(price):
+#         date = datetime.now()
+#         last_month = date.month - 1
+#         beginning_of_period = datetime(date.year, last_month, 1)
+
+#         docs = list(
+#             contracts.find(
+#                 {
+#                     "contractname": {
+#                         "$nin": [
+#                             "HOSPITAL PRICE - 22-10-20",
+#                             "1-49 PRICE - 22-10-20",
+#                             "50+ PRICE - 22-10-20",
+#                         ]
+#                     },
+#                     "contractend": {"$gte": beginning_of_period},
+#                     "pricingagreements.item": item,
+#                 }
+#             )
+#         )
+
+#         if docs:
+#             prices = []
+#             for doc in docs:
+#                 for agreement in doc["pricingagreements"]:
+#                     if agreement["item"] == item:
+#                         prices.append(agreement["price"])
+
+#             avg_price = sum(prices) / len(prices)
+
+#             if avg_price > 0:
+#                 return avg_price
+
+#         doc = costs.find_one(
+#             {
+#                 "alias": item,
+#             }
+#         )
+
+#         if doc:
+#             return doc["cost"] * 1.35
+
+#         return 0.00
+
+#     return price
+
+
+def get_workcenter(wc: str, item: str) -> str:
+    global workcenters
+
+    if item in workcenters:
+        return workcenters[item]
+
+    if wc is not None:
+        workcenters[item] = wc
+
+    return wc
+
+
+# def calculate_cost(item: str, cost: float) -> float:
+#     if cost <= 0 or np.isnan(cost):
+#         doc = costs.find_one(
+#             {
+#                 "alias": item,
+#             }
+#         )
+
+#         if not doc:
+#             return 0.00
+
+#         if item == "649B":
+#             print(doc["cost"], item, cost)
+
+#         return doc["cost"]
+#     return cost
 
 
 def unencrypt_excel():
@@ -81,21 +208,76 @@ def unencrypt_excel():
     ]
 
     df = df.loc[(df.lot != "") & (df.lot.notnull())][
-        ["item", "lot", "run_date_time", "qty"]
+        ["item", "lot", "run_date_time", "qty", "wc"]
     ].copy()
 
-    df = df.loc[~df.lot.str.contains(r"[A-Z]")].copy()
-    df.item = df.item.astype(str)
-    df.lot = df.lot.astype(int)
-    df.run_date_time = df.run_date_time.astype(str)
-    df.qty = df.qty.apply(lambda x: convert_float_to_int(x))
+    df["wc"].fillna("", inplace=True)
+
+    df = df.loc[~df["lot"].str.contains(r"[A-Z]")].copy()
+    df["item"] = df["item"].astype(str)
+
+    df["lot"] = df["lot"].astype(int)
+    df["run_date_time"] = df["run_date_time"].astype(str)
+    df["qty"] = df["qty"].apply(lambda x: convert_float_to_int(x))
 
     return df
 
 
 def update(df_xls: pd.DataFrame):
+    print("current:", len(df_xls))
+
     db = SCHEDULE_DB
     table = SCHEDULE_TABLE
+
+    costs_from_db = list(costs.find({}))
+    costs_map = {}
+    for cost in costs_from_db:
+        for item in cost["alias"]:
+            costs_map[item] = cost["cost"]
+
+    def get_cost_from_map(item: str, cost: float) -> float:
+        if cost <= 0 or np.isnan(cost):
+            if item in costs_map:
+                return costs_map[item]
+            return 0.00
+        return cost
+
+    date = datetime.now()
+    last_month = date.month - 1
+    beginning_of_period = datetime(date.year, last_month, 1)
+
+    docs = list(
+        contracts.find(
+            {
+                "contractname": {
+                    "$nin": [
+                        "HOSPITAL PRICE - 22-10-20",
+                        "1-49 PRICE - 22-10-20",
+                        "50+ PRICE - 22-10-20",
+                    ]
+                },
+                "contractend": {"$gte": beginning_of_period},
+            }
+        )
+    )
+    prices_map = {}
+
+    for doc in docs:
+        for agreement in doc["pricingagreements"]:
+            if agreement["item"] not in prices_map:
+                prices_map[agreement["item"]] = []
+
+            prices_map[agreement["item"]].append(agreement["price"])
+
+    for item in prices_map:
+        prices_map[item] = sum(prices_map[item]) / len(prices_map[item])
+
+    def get_price_from_map(item: str, price: float) -> float:
+        if price <= 0 or np.isnan(price):
+            if item in prices_map:
+                return prices_map[item]
+            return 0.00
+        return price
 
     try:
         with sqlite3.connect(db) as conn:
@@ -105,13 +287,63 @@ def update(df_xls: pd.DataFrame):
                 con=conn,
             )
 
-            df_concat = pd.concat([df, df_xls], ignore_index=True)
+            df_concat = pd.concat([df_xls, df], ignore_index=True)
             df_concat.drop_duplicates(subset=["lot"], inplace=True)
 
-            df_concat.item = df_concat.item.astype(str)
-            df_concat.lot = df_concat.lot.astype(int)
-            df_concat.run_date_time = df_concat.run_date_time.astype(str).str[:10]
-            df_concat.qty = df_concat.qty.apply(lambda x: convert_float_to_int(x))
+            df_concat["item"] = df_concat["item"].astype(str)
+            df_concat["lot"] = df_concat["lot"].astype(int)
+            df_concat["run_date_time"] = df_concat["run_date_time"].astype(str).str[:10]
+            df_concat["qty"] = df_concat["qty"].apply(lambda x: convert_float_to_int(x))
+
+            df_concat["avg_contract_price"] = df_concat.apply(
+                lambda x: get_price_from_map(x["item"], x["avg_contract_price"]),
+                axis=1,
+            )
+
+            df_concat["cost"] = df_concat.apply(
+                lambda x: get_cost_from_map(x["item"], x["cost"]), axis=1
+            )
+
+            df_concat["avg_contract_price"] = (
+                df_concat["avg_contract_price"].astype(float).round(2)
+            )
+            df_concat["cost"] = df_concat["cost"].astype(float).round(2)
+
+            df_concat["gross_profit"].fillna(0, inplace=True)
+            df_concat["margin"].fillna(0, inplace=True)
+
+            df_concat["gross_profit"] = df_concat.apply(
+                lambda x: calculate_gross_profit(x["avg_contract_price"], x["cost"]),
+                axis=1,
+            )
+            df_concat["margin"] = df_concat.apply(
+                lambda x: calculate_gross_margin(x["avg_contract_price"], x["cost"]),
+                axis=1,
+            )
+
+            df_concat["gross_profit"] = df_concat["gross_profit"].astype(float).round(2)
+            df_concat["margin"] = df_concat["margin"].astype(float).round(2)
+
+            df_concat["wc"] = df_concat.apply(
+                lambda x: get_workcenter(x["wc"], x["item"]), axis=1
+            )
+
+            df_concat["order_value"] = df_concat.apply(
+                lambda x: calculate_order_value(x["qty"], x["avg_contract_price"]),
+                axis=1,
+            )
+            df_concat["order_value"] = df_concat["order_value"].astype(float).round(2)
+
+            df_concat["order_cost"] = df_concat.apply(
+                lambda x: calculate_order_cost(x["qty"], x["cost"]), axis=1
+            )
+            df_concat["order_cost"] = df_concat["order_cost"].astype(float).round(2)
+
+            df_concat["order_profit"] = df_concat.apply(
+                lambda x: calculate_order_profit(x["order_value"], x["order_cost"]),
+                axis=1,
+            )
+            df_concat["order_profit"] = df_concat["order_profit"].astype(float).round(2)
 
             df_concat.to_sql(table, con=conn, if_exists="replace", index=False)
 
@@ -119,6 +351,8 @@ def update(df_xls: pd.DataFrame):
         print(e)
     finally:
         conn.close()
+
+    print("Updated schedule.db")
 
     return
 
@@ -147,32 +381,55 @@ def get(limit: int = 1000):
     finally:
         conn.close()
 
-    return df[["item", "lot", "run_date_time", "qty", "description"]]
+    return df[
+        [
+            "item",
+            "lot",
+            "run_date_time",
+            "qty",
+            "description",
+        ]
+    ]
 
 
-# def update_parts_table():
-#     MONGODB_URI = os.environ.get("MONGODB_URI", None)
-#     assert MONGODB_URI is not None, "MONGODB_URI environment variable not set"
+def get_with_financials(limit: int = 1000):
+    db = SCHEDULE_DB
+    table = SCHEDULE_TABLE
 
-#     from pymongo import MongoClient
+    try:
+        with sqlite3.connect(db) as conn:
+            sql_query = f"SELECT * FROM '{table}' INNER JOIN 'parts' ON item=part ORDER BY run_date_time DESC LIMIT {limit}"
+            if limit == -1:
+                sql_query = f"SELECT * FROM '{table}' INNER JOIN 'parts' ON item=part ORDER BY run_date_time DESC"
 
-#     client = MongoClient(MONGODB_URI)
-#     db = client.get_database("busserebatetraces")
-#     collection = db.get_collection("sched_data")
+            df = pd.read_sql(
+                sql_query,
+                con=conn,
+            )
 
-#     docs = list(collection.find({}, {"_id": 0, "part": 1, "description": 1}))
+            df.fillna("", inplace=True)
+    except sqlite3.Error as e:
+        print(e)
+    finally:
+        conn.close()
 
-#     df = pd.DataFrame(docs)
-
-#     try:
-#         with sqlite3.connect(SCHEDULE_DB) as conn:
-#             df.to_sql("parts", con=conn, if_exists="replace", index=False)
-#     except sqlite3.Error as e:
-#         print(e)
-#     finally:
-#         conn.close()
-
-#     return
+    return df[
+        [
+            "item",
+            "lot",
+            "run_date_time",
+            "qty",
+            "description",
+            "wc",
+            "avg_contract_price",
+            "cost",
+            "gross_profit",
+            "margin",
+            "order_value",
+            "order_cost",
+            "order_profit",
+        ]
+    ]
 
 
 if __name__ == "__main__":

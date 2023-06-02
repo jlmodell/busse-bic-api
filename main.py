@@ -4,9 +4,10 @@ from fastapi import FastAPI
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 import uvicorn
-from utility import unencrypt_excel, update, get
+from utility import unencrypt_excel, update, get, get_with_financials
 from apscheduler.schedulers.asyncio import AsyncIOScheduler
-from apscheduler.schedulers.background import BackgroundScheduler
+
+# from apscheduler.schedulers.background import BackgroundScheduler
 
 app = FastAPI()
 app.add_middleware(
@@ -20,6 +21,7 @@ app.add_middleware(
 
 async def update_lots() -> None:
     df = unencrypt_excel()
+
     update(df)
 
     now = datetime.now()
@@ -74,6 +76,13 @@ async def refresher():
 @app.get("/api/bic/data")
 async def decrypt_and_return_dict(limit: int = 1000):
     df = get(limit).to_dict(orient="records")
+
+    return JSONResponse(content=df)
+
+
+@app.get("/api/schedule/data")
+async def decrypt_and_return_dict(limit: int = 1000):
+    df = get_with_financials(limit).to_dict(orient="records")
 
     return JSONResponse(content=df)
 

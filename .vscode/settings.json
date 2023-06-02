@@ -1,0 +1,10 @@
+{
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "driver": "SQLite",
+            "name": "schedule",
+            "database": "\\\\128.1.1.2\\fs1\\PKG Schedule\\schedule.db"
+        }
+    ]
+}
