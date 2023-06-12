@@ -4,7 +4,7 @@ from datetime import datetime
 
 import pandas as pd
 import numpy as np
-from db import contracts, costs  # , sched_data
+from db import contracts, costs, sched_data
 import io
 from dotenv import load_dotenv
 
@@ -24,8 +24,7 @@ assert (
     ENCRYPTION_PASSWORD is not None
 ), "ENCRYPTION_PASSWORD environment variable not set"
 
-workcenters = {}
-
+workcenters = {x["part"]: x for x in list(sched_data.find().projection({"_id": 0}))}
 
 def convert_float_to_int(nbr: str) -> int:
     try:
@@ -78,82 +77,12 @@ def calculate_order_profit(value: float, cost: float) -> float:
         return 0
 
 
-# def calculate_average_price(item: str, price: float) -> float:
-#     if price <= 0 or np.isnan(price):
-#         date = datetime.now()
-#         last_month = date.month - 1
-#         beginning_of_period = datetime(date.year, last_month, 1)
-
-#         docs = list(
-#             contracts.find(
-#                 {
-#                     "contractname": {
-#                         "$nin": [
-#                             "HOSPITAL PRICE - 22-10-20",
-#                             "1-49 PRICE - 22-10-20",
-#                             "50+ PRICE - 22-10-20",
-#                         ]
-#                     },
-#                     "contractend": {"$gte": beginning_of_period},
-#                     "pricingagreements.item": item,
-#                 }
-#             )
-#         )
-
-#         if docs:
-#             prices = []
-#             for doc in docs:
-#                 for agreement in doc["pricingagreements"]:
-#                     if agreement["item"] == item:
-#                         prices.append(agreement["price"])
-
-#             avg_price = sum(prices) / len(prices)
-
-#             if avg_price > 0:
-#                 return avg_price
-
-#         doc = costs.find_one(
-#             {
-#                 "alias": item,
-#             }
-#         )
-
-#         if doc:
-#             return doc["cost"] * 1.35
-
-#         return 0.00
-
-#     return price
-
-
 def get_workcenter(wc: str, item: str) -> str:
     global workcenters
 
-    if item in workcenters:
-        return workcenters[item]
+    wc = workcenters[item].get(wc, "Not Found in SCHED.DATA2")  
 
-    if wc is not None:
-        workcenters[item] = wc
-
-    return wc
-
-
-# def calculate_cost(item: str, cost: float) -> float:
-#     if cost <= 0 or np.isnan(cost):
-#         doc = costs.find_one(
-#             {
-#                 "alias": item,
-#             }
-#         )
-
-#         if not doc:
-#             return 0.00
-
-#         if item == "649B":
-#             print(doc["cost"], item, cost)
-
-#         return doc["cost"]
-#     return cost
+    return "Not Found in SCHED.DATA2"
 
 
 def unencrypt_excel():
