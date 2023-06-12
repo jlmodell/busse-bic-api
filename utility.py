@@ -84,7 +84,7 @@ def get_workcenter(wc: str, item: str) -> str:
     global workcenters
 
     if item in workcenters:
-        wc = workcenters[item].get(wc, "Not Found in SCHED.DATA2")
+        wc = workcenters[item].get("wc", "Not Found in SCHED.DATA2")
 
     return wc
 
