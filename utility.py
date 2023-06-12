@@ -24,7 +24,7 @@ assert (
     ENCRYPTION_PASSWORD is not None
 ), "ENCRYPTION_PASSWORD environment variable not set"
 
-workcenters = {x["part"]: x for x in list(sched_data.find().projection({"_id": 0}))}
+workcenters = {x["part"]: x for x in list(sched_data.find({}, {"_id": 0}))}
 
 def convert_float_to_int(nbr: str) -> int:
     try:
