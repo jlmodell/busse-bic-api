@@ -80,9 +80,10 @@ def calculate_order_profit(value: float, cost: float) -> float:
 def get_workcenter(wc: str, item: str) -> str:
     global workcenters
 
-    wc = workcenters[item].get(wc, "Not Found in SCHED.DATA2")  
+    if item in workcenters:
+        wc = workcenters[item].get(wc, "Not Found in SCHED.DATA2")
 
-    return "Not Found in SCHED.DATA2"
+    return wc
 
 
 def unencrypt_excel():
