@@ -182,12 +182,16 @@ def update(df_xls: pd.DataFrame):
     docs = list(
         contracts.find(
             {
-                "contractname": {
-                    "$nin": [
-                        "HOSPITAL PRICE - 22-10-20",
-                        "1-49 PRICE - 22-10-20",
-                        "50+ PRICE - 22-10-20",
-                    ]
+                # "contractname": {
+                #     "$nin": [
+                #         "HOSPITAL PRICE - 22-10-20",
+                #         "1-49 PRICE - 22-10-20",
+                #         "50+ PRICE - 22-10-20",
+                #     ]
+                # },
+                "contractnumber": {
+                    "$regex": "^(C|R)",
+                    "$options": "i"                    
                 },
                 "contractend": {"$gte": beginning_of_period},
             }
@@ -203,7 +207,17 @@ def update(df_xls: pd.DataFrame):
             prices_map[agreement["item"]].append(agreement["price"])
 
     for item in prices_map:
-        prices_map[item] = sum(prices_map[item]) / len(prices_map[item])
+        # if prices_map[item] is not None or None not in prices_map[item]:
+        #     prices_map[item] = sum(prices_map[item]) / len(prices_map[item])
+
+        if item != "" and None not in prices_map[item]:
+            try:        
+                prices_map[item] = sum(prices_map[item]) / len(prices_map[item])
+            except TypeError as t:
+                print(t)
+                print(item)
+                print(prices_map[item])
+                continue
 
     def get_price_from_map(item: str, price: float) -> float:
         if price <= 0 or np.isnan(price):
