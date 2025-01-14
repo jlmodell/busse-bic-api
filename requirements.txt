@@ -34,4 +34,3 @@ tzdata==2022.1
 tzlocal==4.2
 uvicorn==0.18.2
 xlrd==2.0.1
-pydantic-settings==2.7.1

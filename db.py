@@ -1,5 +1,5 @@
 import yaml
-from pydantic_settings import BaseSettings
+# from pydantic_settings import BaseSettings
 from pymongo import MongoClient
 import os
 
@@ -13,12 +13,12 @@ def get_db_connection():
     return db_config
 
 
-class Client(BaseSettings):
-    uri: str
-    client: MongoClient = None
+# class Client(BaseSettings):
+#     uri: str
+#     client: MongoClient = None
 
-    def connect(self):
-        self.client = MongoClient(self.uri)
+#     def connect(self):
+#         self.client = MongoClient(self.uri)
 
 
 DB_CONFIG = get_db_connection()
