@@ -148,6 +148,9 @@ def unencrypt_excel():
 
     df = df.loc[~df["lot"].str.contains(r"[A-Z]")].copy()
     df["item"] = df["item"].astype(str)
+    df = df.loc[~df["item"].str.contains(r"nan")].copy()
+    
+    df.to_excel("schedule.xlsx", index=False)
 
     df["lot"] = df["lot"].astype(int)
     df["run_date_time"] = df["run_date_time"].astype(str)
@@ -177,6 +180,8 @@ def update(df_xls: pd.DataFrame):
 
     date = datetime.now()
     last_month = date.month - 1
+    if last_month == 0:
+        last_month = 12
     beginning_of_period = datetime(date.year, last_month, 1)
 
     docs = list(
@@ -381,3 +386,5 @@ def get_with_financials(limit: int = 1000):
 
 if __name__ == "__main__":
     print("utility.py")
+    df = unencrypt_excel()
+

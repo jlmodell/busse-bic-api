@@ -1,5 +1,5 @@
 import yaml
-from pydantic import BaseSettings
+from pydantic_settings import BaseSettings
 from pymongo import MongoClient
 import os
 
@@ -46,12 +46,19 @@ assert (
     SCHED_DATA is not None
 ), "MongoDB databases.busserebatetraces.sched_data is not set, check config.yaml"
 
-client = Client(uri=DB_CONFIG["mongodb"]["atlas"]["uri"])
-client.connect()
+# print(DB_CONFIG["mongodb"]["atlas"]["uri"])
+client = MongoClient(DB_CONFIG["mongodb"]["atlas"]["uri"])
+# client.connect()
 
-contracts = client.client[BUSSE_PRICING_DATA][CONTRACTS]
-costs = client.client[BUSSE_PRICING_DATA][COSTS]
-sched_data = client.client[BUSSEREBATETRACES][SCHED_DATA]
+contract_db = client.bussepricing
+sched_data_db = client.busserebatetraces
+
+contracts = contract_db.contract_prices
+costs = contract_db.costs
+sched_data = sched_data_db.sched_data
+
 
 if __name__ == "__main__":
     print(contracts)
+    print(sched_data)
+    
