@@ -10,6 +10,9 @@ from dotenv import load_dotenv
 
 load_dotenv()
 
+
+workcenters = {x["part"]: x for x in list(sched_data.find({}, {"_id": 0}))}
+
 SCHEDULE_DB = os.environ.get("SCHEDULE_DB", None)
 assert SCHEDULE_DB is not None, "SCHEDULE_DB environment variable not set"
 
@@ -27,11 +30,6 @@ assert (
     ENCRYPTION_PASSWORD is not None
 ), "ENCRYPTION_PASSWORD environment variable not set"
 
-workcenters = {x["part"]: x for x in list(sched_data.find({}, {"_id": 0}))}
-
-if "7883R1" in workcenters:
-    print(workcenters["7883R1"])
-
 def convert_float_to_int(nbr: str) -> int:
     try:
         return int(nbr)
@@ -39,14 +37,12 @@ def convert_float_to_int(nbr: str) -> int:
         nbr = nbr.replace(",", "").split(".")[0]
         return int(nbr)
 
-
 def calculate_gross_profit(price: float, cost: float) -> float:
     try:
         return price - cost
     except TypeError:
         print(price, cost)
         return 0
-
 
 def calculate_gross_margin(price: float, cost: float) -> float:
     try:
@@ -167,76 +163,6 @@ def update_parts_table():
 
     return
 
-def unencrypt_excel():
-    with open(SCHEDULE_XLS, "rb") as f:
-        file = io.BytesIO(f.read())
-
-    decrypted = io.BytesIO()
-
-    try:
-        ms = msoffcrypto.OfficeFile(file)
-        ms.load_key(password=ENCRYPTION_PASSWORD)
-        ms.decrypt(decrypted)
-    except Exception as e:
-        # print(e)
-        pass
-
-    try:
-        df = pd.read_excel(decrypted, "Schedule", header=1)
-    except:
-        df = pd.read_excel(file, "Schedule", header=1)
-
-    df.columns = df.iloc[0]
-    df.drop(df.index[0])
-
-    df.columns = [
-        "requested",
-        "wh_issue_date",
-        "pulled",
-        "posted",
-        "racks",
-        "parts_prep",
-        "ready",
-        "wc_ready",
-        "job_done",
-        "request",
-        "in_parts_prep_by",
-        "l",
-        "run_date_time",
-        "n",
-        "item",
-        "wc",
-        "tooling",
-        "r",
-        "description",
-        "lot",
-        "lot_info",
-        "qty",
-        "comments",
-        "x",
-        "mp",
-        "pallets",
-    ]
-
-    df = df.loc[(df.lot != "") & (df.lot.notnull())][
-        ["item", "lot", "run_date_time", "qty", "wc"]
-    ].copy()
-
-    df["wc"].fillna("", inplace=True)
-
-    df = df.loc[~df["lot"].str.contains(r"[A-Z]")].copy()
-    df["item"] = df["item"].astype(str)
-    df = df.loc[~df["item"].str.contains(r"nan")].copy()
-    
-    df.to_excel("schedule.xlsx", index=False)
-
-    df["lot"] = df["lot"].astype(int)
-    df["run_date_time"] = df["run_date_time"].astype(str)
-    df["qty"] = df["qty"].apply(lambda x: convert_float_to_int(x))
-
-    return df
-
-
 def update(df_xls: pd.DataFrame):
     print("current:", len(df_xls))
 
@@ -320,6 +246,9 @@ def update(df_xls: pd.DataFrame):
             )
 
             df_concat = pd.concat([df_xls, df], ignore_index=True)
+
+            df_concat.to_excel("schedule_concat.xlsx", index=False)
+
             df_concat.drop_duplicates(subset=["lot"], inplace=True)
 
             df_concat["item"] = df_concat["item"].astype(str)
@@ -388,83 +317,71 @@ def update(df_xls: pd.DataFrame):
 
     return
 
-
-def drop(table="Released Schedule"):
-    with sqlite3.connect("schedule.db") as conn:
-        conn.execute(f"DROP TABLE IF EXISTS '{table}'")
-
-
-def get(limit: int = 1000):
-    db = SCHEDULE_DB
-    table = SCHEDULE_TABLE
-
-    try:
-        with sqlite3.connect(db) as conn:
-            sql_query = f"SELECT * FROM '{table}' INNER JOIN 'parts' ON item=part ORDER BY run_date_time DESC LIMIT {limit}"
-            if limit == -1:
-                sql_query = f"SELECT * FROM '{table}' INNER JOIN 'parts' ON item=part ORDER BY run_date_time DESC"
-
-            df = pd.read_sql(
-                sql_query,
-                con=conn,
-            )
-    except sqlite3.Error as e:
-        print(e)
-    finally:
-        conn.close()
-
-    return df[
-        [
-            "item",
-            "lot",
-            "run_date_time",
-            "qty",
-            "description",
-        ]
-    ]
-
-
-def get_with_financials(limit: int = 1000):
-    db = SCHEDULE_DB
-    table = SCHEDULE_TABLE
-
-    try:
-        with sqlite3.connect(db) as conn:
-            sql_query = f"SELECT * FROM '{table}' INNER JOIN 'parts' ON item=part ORDER BY run_date_time DESC LIMIT {limit}"
-            if limit == -1:
-                sql_query = f"SELECT * FROM '{table}' INNER JOIN 'parts' ON item=part ORDER BY run_date_time DESC"
-
-            df = pd.read_sql(
-                sql_query,
-                con=conn,
-            )
-
-            df.fillna("", inplace=True)
-    except sqlite3.Error as e:
-        print(e)
-    finally:
-        conn.close()
-
-    return df[
-        [
-            "item",
-            "lot",
-            "run_date_time",
-            "qty",
-            "description",
-            "wc",
-            "avg_contract_price",
-            "cost",
-            "gross_profit",
-            "margin",
-            "order_value",
-            "order_cost",
-            "order_profit",
-        ]
-    ]
-
-
 if __name__ == "__main__":
-    print("utility.py")
-    df = unencrypt_excel()
+    with open(SCHEDULE_XLS, "rb") as f:
+        file = io.BytesIO(f.read())
 
+    decrypted = io.BytesIO()
+
+    try:
+        ms = msoffcrypto.OfficeFile(file)
+        ms.load_key(password=ENCRYPTION_PASSWORD)
+        ms.decrypt(decrypted)
+    except Exception as e:
+        # print(e)
+        pass
+
+    try:
+        df = pd.read_excel(decrypted, "Schedule", engine="openpyxl", header=1)
+    except:
+        df = pd.read_excel(file, "Schedule", header=1)
+
+    df.columns = df.iloc[0]
+    df.drop(df.index[0])
+
+    df.columns = [
+        "requested",
+        "wh_issue_date",
+        "pulled",
+        "posted",
+        "racks",
+        "parts_prep",
+        "ready",
+        "wc_ready",
+        "job_done",
+        "request",
+        "in_parts_prep_by",
+        "l",
+        "run_date_time",
+        "n",
+        "item",
+        "wc",
+        "tooling",
+        "r",
+        "description",
+        "lot",
+        "lot_info",
+        "qty",
+        "comments",
+        "x",
+        "mp",
+        "pallets",
+    ]
+
+    df = df.loc[(df.lot != "") & (df.lot.notnull()) & (~df.item.isna())][
+        ["item", "lot", "run_date_time", "qty", "wc"]
+    ].copy()
+
+    df["wc"].fillna("", inplace=True)
+
+    df = df.loc[~df["lot"].str.contains(r"[A-Z]")].copy()
+    df["item"] = df["item"].astype(str)
+    df = df.loc[~df["item"].str.contains(r"nan")].copy()
+    
+    df.to_excel("schedule.xlsx", index=False)
+
+    df["lot"] = df["lot"].astype(int)
+    df["run_date_time"] = df["run_date_time"].astype(str)
+    df["qty"] = df["qty"].apply(lambda x: convert_float_to_int(x))
+
+    update(df)
